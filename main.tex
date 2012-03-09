@@ -281,8 +281,65 @@
   \end{itemize}
 \end{frame}
 
-\section{Impossibility results}
-\subsection{Asynchronous model}
+\section{FLP impossibility}
+\subsection{The result}
+\begin{frame}{FLP impossibility theorem}
+  \begin{theorem}[Fischer, Lynch, Patersson 1985]
+    Consensus is impossible to achieve in a sufficiently asynchronous system with even one crashed process.
+  \end{theorem}
+
+  \begin{itemize}
+    \item The actual result is stronger. It asserts the impossibility of the weakest form of consensus possible, namely when there \emph{exists} a process that \textsc{decide}s.
+    \item To prove it, we need to specify the computation model more precisely...
+  \end{itemize}
+\end{frame}
+
+\subsection{The model}
+\begin{frame}{The message system}
+  Let $\mathbb{P}$ denote the set of processes in our asynchronous system. The processes communicate by sending messages to one another from some fixed universe $\mathbb{M}$ via the \emph{message system}.
+\end{frame}
+
+\begin{frame}{The message system}
+  \begin{definition}
+    The message system is a multiset of sent but not yet delivered messages, called the \emph{message buffer}, with the following two operations:
+    \begin{itemize}
+      \item $\textsc{send}(p, m)$ -- places $(p,m)$ in the message buffer.
+      \item $\textsc{receive}(p)$ -- non-deterministically deletes some message $(p, m)$ from the buffer and returns $m$, or returns $\varnothing$ leaving the buffer unchanged.
+    \end{itemize}
+  The only constraint on the non-determinism of \textsc{receive} is that if there is some $(p, m)$ in the message buffer then there can be no infinite sequence of $\textsc{receive}(p)$ operations all returning $\varnothing$. The message system is thus an abstraction of lossless communication links with arbitrary delays and reordering.
+  \end{definition}
+\end{frame}
+
+\begin{frame}{The processes}
+  \begin{itemize}
+    \item A process is a state machine with $I = \mathbb{M} \cup \{ \varnothing \}$ and $O = (\mathbb{P} \times \mathbb{M})^*$.
+    \item Each process $p$ has a one-bit read-only \alert{input register} $x_p$ and an \alert{output register} $y_p$ with values in $\{ \bot, 0, 1\}$. Each state $q \in Q$ includes the states of these two registers and is otherwise arbitrary.
+    \item The states in which $y_p \ne \bot$ are \alert{decision states}.
+    \item $y_p$ is \alert{write-once}: $y_p$ cannot be changed once the process is in a decision state.
+    \item In an \alert{initial state}, $y_p = \bot$.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{System configuration}
+  \begin{itemize}
+    \item A configuration $C$ of the system is the set $\{ q_p \mid p \in \mathbb{P} \}$ of current process states together with the contents of the message buffer.
+    \item An \alert{initial configuration} is that in which each process is in some initial state and the message buffer is empty.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{System step}
+  A step takes the system from one configuration to another. It consists of a following sequence of actions performed atomically by some process $p$.
+  \begin{itemize}
+    \item $m := \textsc{receive}(p)$
+    \item $(q_p, o) := \varphi_p(q_p, m)$
+    \item $\textsc{send}(p', m')$ for every $(p', m')$ in $o$.
+  \end{itemize}
+  The entire step is determined by the pair $e = (p, m)$ that gets \textsc{receive}d. We will henceforth call $e$ an \alert{event} and denote the configuration that results from applying $e$ to $C$ by $e(C)$.
+\end{frame}
+
+%\begin{frame}{Interprocess communication}
+%
+%\end{frame}
 %\begin{frame}{Atoi
 
 
