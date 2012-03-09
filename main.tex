@@ -1,0 +1,291 @@
+% $Header$
+
+\documentclass{beamer}
+
+% This file is a solution template for:
+
+% - Talk at a conference/colloquium.
+% - Talk length is about 20min.
+% - Style is ornate.
+
+
+
+% Copyright 2004 by Till Tantau <tantau@users.sourceforge.net>.
+%
+% In principle, this file can be redistributed and/or modified under
+% the terms of the GNU Public License, version 2.
+%
+% However, this file is supposed to be a template to be modified
+% for your own needs. For this reason, if you use this file as a
+% template and not specifically distribute it as part of a another
+% package/program, I grant the extra permission to freely copy and
+% modify this file as you see fit and even to delete this copyright
+% notice. 
+
+
+\mode<presentation>
+{
+  \usetheme{Warsaw}
+  % or ...
+
+  \setbeamercovered{transparent}
+  % or whatever (possibly just delete it)
+}
+
+
+\usepackage[english]{babel}
+% or whatever
+
+\usepackage[utf8]{inputenc}
+% or whatever
+
+\usepackage{times}
+\usepackage[T1]{fontenc}
+% Or whatever. Note that the encoding and the font should match. If T1
+% does not look nice, try deleting the line with the fontenc.
+
+%\newtheorem{definition}{Definition}
+
+\title% (optional, use only with long paper titles)
+{Consensus and replication}
+
+\subtitle
+{From impossibility to production}
+
+\author[Alexander Kharitonov]{Alexander Kharitonov \\ \texttt{a@cmpxchg.me}}
+\date{Yandex science seminar, 22 Mar 2012}
+
+%\author[Author, Another] % (optional, use only with lots of authors)
+%{F.~Author\inst{1} \and S.~Another\inst{2}}
+% - Give the names in the same order as the appear in the paper.
+% - Use the \inst{?} command only if the authors have different
+%   affiliation.
+%\institute[Yandex]
+%{
+%    Yandex LLC
+%}
+
+%\institute[Universities of Somewhere and Elsewhere] % (optional, but mostly needed)
+%{
+%  \inst{1}%
+%  Department of Computer Science\\
+%  University of Somewhere
+%  \and
+%  \inst{2}%
+%  Department of Theoretical Philosophy\\
+%  University of Elsewhere}
+% - Use the \inst command only if there are several affiliations.
+% - Keep it simple, no one is interested in your street address.
+
+%\date[CFP 2003] % (optional, should be abbreviation of conference name)
+%{Conference on Fabulous Presentations, 2003}
+% - Either use conference name or its abbreviation.
+% - Not really informative to the audience, more for people (including
+%   yourself) who are reading the slides online
+
+\subject{Distributed systems}
+% This is only inserted into the PDF information catalog. Can be left
+% out. 
+
+
+
+% If you have a file called "university-logo-filename.xxx", where xxx
+% is a graphic format that can be processed by latex or pdflatex,
+% resp., then you can add a logo as follows:
+
+% \pgfdeclareimage[height=0.5cm]{university-logo}{university-logo-filename}
+% \logo{\pgfuseimage{university-logo}}
+
+
+
+% Delete this, if you do not want the table of contents to pop up at
+% the beginning of each subsection:
+\AtBeginSubsection[]
+{
+  \begin{frame}<beamer>{Outline}
+    \tableofcontents[currentsection,currentsubsection]
+  \end{frame}
+}
+
+
+% If you wish to uncover everything in a step-wise fashion, uncomment
+% the following command: 
+
+%\beamerdefaultoverlayspecification{<+->}
+
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Outline}
+  \tableofcontents
+  % You might wish to add the option [pausesections]
+\end{frame}
+
+
+% Structuring a talk is a difficult task and the following structure
+% may not be suitable. Here are some rules that apply for this
+% solution: 
+
+% - Exactly two or three sections (other than the summary).
+% - At *most* three subsections per section.
+% - Talk about 30s to 2min per frame. So there should be between about
+%   15 and 30 frames, all told.
+
+% - A conference audience is likely to know very little of what you
+%   are going to talk about. So *simplify*!
+% - In a 20min talk, getting the main ideas across is hard
+%   enough. Leave out details, even if it means being less precise than
+%   you think necessary.
+% - If you omit details that are vital to the proof/implementation,
+%   just say so once. Everybody will be happy with that.
+
+\section{Motivation}
+\subsection{High availability and state machine replication}
+
+\begin{frame}{Introduction}
+  \begin{itemize}
+  \item We want to build systems that work despite some number of failing components.
+  \item Particularly want no single points of failure.
+  \item Hence such systems are necessarily distributed.
+  \item Unfortunately, distributed systems are very hard to reason about.
+  \item Separate the resilience and application logic: treat the system as a state machine.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{State machine}
+  \begin{definition}
+    A state machine is a tuple $S = (Q, \varphi, I, O)$, where $Q$ is the set of states, $\varphi\colon Q \times I \to Q \times O$ is the state transition function, $I$ is the input command set and $O$ is the output set.
+  \end{definition}
+  Some (trivial) notes:
+  \begin{itemize}
+  \item $Q$ is not necessarily finite, so e.g. a Turing machine is a valid state machine by our definition.
+  \item $\varphi$ is deterministic.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{State machine example: a read-write register}
+  \begin{definition}
+    A read-write register is essentially a memory cell that can hold a single natural number (or be empty).
+    \begin{itemize}
+      \item $Q = \mathbb{N} \cup \{ \bot \}$
+      \item $I = \textsc{read} \cup \{ \textsc{write}(i) \mid i \in \mathbb{N} \}$
+      \item $O = \textsc{ok} \cup Q$
+      \item $\varphi(q, \textsc{read}) = (q, q)$
+      \item $\varphi(q, \textsc{write}(i)) = (i, \textsc{ok})$
+    \end{itemize}
+  \end{definition}
+\end{frame}
+
+%\begin{frame}{Sequential specifications and linearizability}
+%  \begin{itemize}
+%    \item A state machine is a complete sequential specification of the system that it models.
+
+\begin{frame}{State machine replication}
+  \begin{itemize}
+    \item In real life computers crash, power goes out etc. Systems fail.
+    \item To remain available despite faults the system must be replicated.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{State machine replication: the setting}
+  \begin{itemize}
+    \item There is a set of clients $C$ and a set of replicas $R$ which communicate over the network.
+    \item Some protocol provides the clients with an abstraction of a single state machine they all interact with (backed by $R$).
+    \item Can have various consistency guarantees depending on the system model and on kinds of tolerated failures, e.g. linearizability, single-client FIFO, eventual consistency etc.
+    \item Tolerates some kinds of replica failures (again, depends on the system model and synchrony assumptions).
+  \end{itemize}
+\end{frame}
+
+\subsection{Replication, atomic broadcast and consensus}
+
+\begin{frame}{On failure model and synchrony assumptions}
+  We will assume the following:
+  \begin{itemize}
+    \item Failures are crash-stop: no crashed replica ever recovers. This is for simplicity, practically everything can be adapted to the crash-recovery setting.
+    \item The system is initially asynchronous. That means no bounds on message losses and delays, no bounds on the relative speed of the processes, no shared clocks whatsoever.
+    \item There is an (unknown to the processes) Global Stabilization Time, after which no processes crash and message delays and clock drift become bounded (but bounds remain unknown).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{On failure model and synchrony assumptions (cont'd)}
+  \begin{itemize}
+    \item Actually, things need not to remain stable forever after GST. The only requirement for liveness is for the stability period to be long enough for a step of replication to complete.
+    \item Under these assumptions we will construct systems that tolerate up to $\lfloor\frac{n-1}{2}\rfloor$ failures in a system of $n$ processes.
+  \end{itemize}
+  \begin{definition}
+    With respect to some execution of some distributed algorithm, a \alert{correct} process is a process that did not crash in that execution.
+  \end{definition}
+\end{frame}
+
+\begin{frame}{Atomic broadcast}
+  \begin{definition}
+    Atomic broadcast is a group communication primitive providing two operations:
+    \begin{itemize}
+      \item $\textsc{broadcast}(m)$ -- send a message $m$ to everyone in the group
+      \item $\textsc{deliver}(m)$ -- deliver a message.
+    \end{itemize}
+    with the following guarantees:
+  \end{definition}
+\end{frame}
+
+\begin{frame}{Atomic broadcast guarantees}
+  \begin{enumerate}
+    \item If a process \textsc{deliver}s $m$, then all \alert{correct} processes eventually (after GST) deliver $m$.
+    \item A process can only \textsc{deliver} a message that has been \textsc{broadcast} by some process.
+    \item No two processes \textsc{deliver} any two messages in different orders.
+    \item If a correct process \textsc{broadcast}s $m$, then all \alert{correct} processes eventually \textsc{deliver} $m$.
+  \end{enumerate}
+  Guarantees $2$ and $3$ are \alert{uniform safety} properties that hold for \alert{all} processes, including the faulty ones.
+\end{frame}
+
+\begin{frame}{State machine replication via atomic broadcast}
+  \begin{itemize}
+    \item With atomic broadcast state machine replication becomes easy, as it delivers a uniform sequence of message to all replicas.
+    \item A na\"ive but working approach to SMR would be for each client to maintain a copy of the state machine, \textsc{broadcast} its commands and apply commands in the order they are \textsc{deliver}ed.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Consensus}
+  \begin{definition}
+    Consensus is a distributed agreement primitive defined by two operations
+    \begin{itemize}
+      \item $\textsc{propose(v)}$ -- propose a value $v$
+      \item $\textsc{decide(v)}$ -- decide that $v$ has been chosen
+    \end{itemize}
+    satisfying:
+    \begin{enumerate}
+      \item If a process \textsc{decide}s $v$ then some process \textsc{propose}d $v$
+      \item \textsc{decide} \alert{never} decides two different values (in a single consensus execution, there are no two \textsc{decide} calls returning different values).
+      \item If any correct process \textsc{propose}s a value then eventually all correct processes \textsc{decide} some value.
+    \end{enumerate}
+  \end{definition}
+\end{frame}
+
+\begin{frame}{Consensus is equivalent to atomic broadcast}{Consensus via atomic broadcast}
+  \begin{enumerate}
+    \item To \textsc{propose} a value $v$, \textsc{broadcast}($v$).
+    \item \textsc{decide} on a first value \textsc{deliver}ed.
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}{Consensus is equivalent to atomic broadcast}{Atomic broadcast via consensus}
+  \begin{itemize}
+    \item Run a series of consensus instances indexed by $\mathbb{N}$.
+    \item Intuitively, consensus in instance $i$ on a value $m$ means that $m$ is the $i$th value in the broadcast sequence.
+    \item To \textsc{broadcast} a value $v$, pick the lowest instance on which consensus is unknown and \textsc{propose} $v$. Repeat until success.
+    \item \textsc{deliver} values in the order of their instance numbers.
+  \end{itemize}
+\end{frame}
+
+\section{Impossibility results}
+\subsection{Asynchronous model}
+%\begin{frame}{Atoi
+
+
+\end{document}
+
+
