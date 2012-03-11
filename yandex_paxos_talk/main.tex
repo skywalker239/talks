@@ -39,6 +39,9 @@
 \usepackage[utf8]{inputenc}
 % or whatever
 
+\usepackage{tikz}
+\usetikzlibrary{arrows, shapes}
+
 \usepackage{times}
 \usepackage[T1]{fontenc}
 % Or whatever. Note that the encoding and the font should match. If T1
@@ -337,6 +340,187 @@
   The entire step is determined by the pair $e = (p, m)$ that gets \textsc{receive}d. We will henceforth call $e$ an \alert{event} and denote the configuration that results from applying $e$ to $C$ by $e(C)$.
 \end{frame}
 
+\begin{frame}{System evolution}
+  \begin{itemize}
+    \item A \alert{schedule} from $C$ is a sequence $\sigma$ of events that can be applied, in turn, starting from $C$.
+    \item A \alert{run} from $C$ is a sequence of steps corresponding to a schedule from $C$.
+    \item If $\sigma$ is finite, then let $\sigma(C)$ denote the configuration resulting from applying $\sigma$ to $C$. We say that $\sigma(C)$ is \alert{reachable} from $C$.
+    \item A configuration reachable from some initial configuration is said to be \alert{accessible}. We will only consider accessible configurations hereafter.
+  \end{itemize}
+\end{frame}
+
+\subsection{The proof}
+\begin{frame}{Disjoint schedule commutativity}
+  \begin{lemma}
+    Consider two schedules $\sigma_1, \sigma_2$ from some configuration $C$. If the sets of processes taking steps in $\sigma_1$ and $\sigma_2$ are disjoint, then $\sigma_1(\sigma_2(C)) = \sigma_2(\sigma_1(C)) = C'$.
+  \end{lemma}
+  \begin{proof}
+    Obvious.
+  \end{proof}
+\end{frame}
+
+\begin{frame}{Disjoint schedule commutativity}
+  \begin{figure}[!h]
+  \centering
+  \begin{tikzpicture}[transform shape, scale=2]
+    \tikzstyle{every node} = [shape=circle]
+    \node (a) [draw] at (1, 2) {\tiny $C$};
+    \node (b) [draw] at (0, 1) {\tiny $\sigma_1(C)$};
+    \node (c) [draw] at (2, 1) {\tiny $\sigma_2(C)$};
+    \node (d) [draw] at (1, 0) {\tiny $C'$};
+      \draw [->] (a) -- (b) node[pos=.5,sloped,above] {\tiny $\sigma_1$};
+      \draw [->] (a) -- (c) node[pos=.5,sloped,above] {\tiny $\sigma_2$};
+      \draw [dashed, ->] (b) -- (d) node[pos=.5,sloped,below] {\tiny $\sigma_2$};
+      \draw [dashed, ->] (c) -- (d) node[pos=.5,sloped,below] {\tiny $\sigma_1$};
+  \end{tikzpicture}
+  \end{figure}
+\end{frame}
+
+\begin{frame}{Correctness of a consensus protocol}
+  \begin{definition}
+    A configuration $C$ has decision value $v \in \{ 0, 1 \}$ if some $p \in \mathbb{P}$ is in a decision state with $y_p = v$.
+  \end{definition}
+  \begin{definition}
+    A consensus protocol is \alert{partially correct} if:
+    \begin{itemize}
+      \item No accessible configuration has more than one decision value.
+      \item $\forall\, v \in \{0, 1\}\,\exists$ accessible configuration with decision value $v$.
+    \end{itemize}
+  \end{definition}
+\end{frame}
+
+\begin{frame}{Correctness of a consensus protocol}
+  \begin{itemize}
+    \item A process is \alert{nonfaulty} in a run iff it takes infinitely many steps and \alert{faulty} otherwise.
+    \item A run is \alert{admissible} iff at most one process is faulty and all messages sent to nonfaulty processes are eventually received.
+    \item A run is \alert{deciding} if some process reaches a decision state in it.
+    \item A consensus protocol $P$ is \alert{totally correct in spite of one fault} iff it is partially correct and every admissible run is deciding.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Proof outline}
+  We want to prove that no partially correct consensus algorithm is totally correct in spite of one fault. We do that in two steps:
+  \begin{itemize}
+    \item Prove that there exists an initial configuration in which the decision is not predetermined.
+    \item Construct an admissible run from that configuration which avoids ever taking a step that would commit it to a decision.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Univalent and bivalent configurations}
+  \begin{definition}
+    Let $V$ be a set of decision values of configurations reachable from $C$. C is \alert{bivalent} if $|V| = 2$ and \alert{univalent} if $|V| = 1$ ($0$-valent or $1$-valent).
+    
+    Note that by the total correctness of $P$ $V \ne \varnothing$.
+  \end{definition}
+  \begin{lemma}
+    $P$ has a bivalent initial configuration.
+  \end{lemma}
+\end{frame}
+
+\begin{frame}{Proof of lemma}
+Each initial configuration corresponds to a vector $\{ x_p \mid p \in \mathbb{P} \}$ of initial values.
+  \begin{itemize}
+    \item By partial correctness there exist both $0$-valent and $1$-valent initial configurations.
+    \item There exist two initial configurations $C_0$ and $C_1$ s.t. $C_i$ is $i$-valent and they only differ in one $x_p$.
+    \item Consider an admissible schedule from $C_0$ in which $p$ is initially dead (takes no steps). By total correctness it reaches a decision value of $0$.
+    \item Apply this schedule to $C_1$. Get the same configuration except for state of $p$, but $p$ takes no steps, so the run from $C_1$ also reaches a decision value of $0$.
+    \item Contradiction, as $C_1$ is $1$-valent.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{``Delay'' lemma}
+  \begin{lemma}
+    Let $C$ be a bivalent configuration of $P$ and $e=(p,m)$ be an event applicable to $C$. Let $\mathcal{C}$ be the set of configurations reachable from $C$ without applying $e$ and let $\mathcal{D} = e(\mathcal{C})$. Then $\mathcal{D}$ contains a bivalent configuration.
+  \end{lemma}
+\end{frame}
+
+\begin{frame}{Proof of the delay lemma}
+  \begin{itemize}
+    \item Proof will be by contradiction. Assume that $\mathcal{D}$ contains no bivalent configurations.
+    \item Note that $\mathcal{D}$ contains both $0$- and $1$-valent configurations.
+    \item There exist $C_0$ and $C_1$ that are reachable from $C$ and $C_i$ is $i$-valent by the bivalence of $C$.
+    \item If $C_i$ is in $\mathcal{C}$, then $e(C_i) \in \mathcal{D}$ and is also $i$-valent.
+    \item Otherwise, $e$ was applied on the path to $C_i$ and there exists an $F_i \in \mathcal{D}$ from which $C_i$ is reachable. $F_i$ is then $i$-valent.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Proof of the delay lemma}
+  \begin{itemize}
+    \item Two configurations are \alert{neighbours} iff one of them is reachable from the other in a single step.
+    \item There exist neighbours $F_0, F_1$ in $\mathcal{C}$ s.t. $D_i = e(F_i)$ is $i$-valent, $i = 0,1$.
+    \item W.l.o.g., $F_1 = e'(F_0)$, $e' = (p', m')$.
+    \item Consider two cases: $p \ne p'$ and $p = p'$.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{$p \ne p'$}
+  \begin{figure}[!h]
+  \centering
+  \begin{tikzpicture}[transform shape, scale=1.5]
+    \tikzstyle{every node} = [shape=circle]
+    \node (a) [draw] at (1, 2) {\tiny $F_0$};
+    \node (b) [draw] at (0, 1) {\tiny $E_0$};
+    \node (c) [draw] at (2, 1) {\tiny $F_1$};
+    \node (d) [draw] at (1, 0) {\tiny $E_1$};
+      \draw [->] (a) -- (c) node[pos=.5,sloped,above] {\tiny $e'$};
+      \draw [->] (a) -- (b) node[pos=.5,sloped,above] {\tiny $e$};
+      \draw [dashed, ->] (b) -- (d) node[pos=.5,sloped,below] {\tiny $e'$};
+      \draw [dashed, ->] (c) -- (d) node[pos=.5,sloped,below] {\tiny $e$};
+  \end{tikzpicture}
+  \end{figure}
+Contradiction: $E_1$ is both $0$- and $1$-valent.
+\end{frame}
+
+\begin{frame}{$p = p'$}
+  Consider any finite deciding run from $F_0$ in which $p$ takes no steps, let $\sigma$ be the corresponding schedule and $A = \sigma(F_0)$.
+\end{frame}
+
+\begin{frame}{$p = p'$}
+  \begin{figure}[!h]
+  \centering
+  \begin{tikzpicture}[transform shape, scale=1.5]
+    \tikzstyle{every node} = [shape=circle]
+    \node (f0) [draw] at (1, 2.5) {\tiny $F_0$};
+    \node (f1) [draw] at (2, 2) {\tiny $F_1$};
+    \node (e1) [draw] at (3, 1.5) {\tiny $E_1$};
+    \node (e0) [draw] at (0, 1.5) {\tiny $E_0$};
+    \node (a)  [draw] at (1, 1) {\tiny $A$};
+    \node (nn) [draw] at (2, .5) {};
+    \node (g0) [draw] at (0, 0) {\tiny $G_0$};
+    \node (g1) [draw] at (3, 0) {\tiny $G_1$};
+    \draw [->] (f0) -- (e0) node[pos=.5, above] {\tiny $e$};
+    \draw [->] (f0) -- (f1) node[pos=.5, above] {\tiny $e'$};
+    \draw [->] (f1) -- (e1) node[pos=.5, above] {\tiny $e$};
+    \draw [densely dotted, ->] (f0) -- (a) node[pos=.5, right] {\tiny $\sigma$};
+    \draw [densely dotted, ->] (e0) -- (g0) node[pos=.5, left] {\tiny $\sigma$};
+    \draw [densely dotted, ->] (e1) -- (g1) node[pos=.5, right] {\tiny $\sigma$};
+    \draw [dashed, ->] (a) -- (g0) node[pos=.5, above] {\tiny $e$};
+    \draw [dashed, ->] (a) -- (nn) node[pos=.5, above] {\tiny $e'$};
+    \draw [dashed, ->] (nn) -- (g1) node[pos=.5, above] {\tiny $e$};
+  \end{tikzpicture}
+  \end{figure}
+  Contradiction: the run to $A$ is deciding, but $A$ is bivalent! This concludes the case analysis and proves the lemma.
+\end{frame}
+
+\begin{frame}{Constructing an infinite non-deciding run}
+  \begin{itemize}
+    \item The message buffer is ordered by the time messages were sent.
+    \item Organize the processes into a queue (initially in arbitrary order).
+    \item The run will consist of an infinite sequence of stages each starting and ending in a bivalent configuration.
+    \item At the beginning of each stage, consider the earliest pending message $m$ to $p_{head}$ (process at the head of the queue) or let $m = \varnothing$.
+    \item Apply the delay lemma to $e=(p_{head}, m)$ and arrive to a bivalent configuration with $e$ applied last.
+    \item Move $p_{head}$ to the tail of the queue.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Constructing an infinite non-deciding run}
+  The sequence of stages constructed in this way from a bivalent initial configuration constitutes an admissible run which never decides on a value. In fact, this run has \alert{no faulty processes}.
+
+  We have just proven
+  \begin{theorem}[FLP impossibility]
+    No consensus protocol is totally correct in spite of one fault.
+  \end{theorem}
+\end{frame}
 %\begin{frame}{Interprocess communication}
 %
 %\end{frame}
