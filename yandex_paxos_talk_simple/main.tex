@@ -100,17 +100,6 @@
 % \logo{\pgfuseimage{university-logo}}
 
 
-
-% Delete this, if you do not want the table of contents to pop up at
-% the beginning of each subsection:
-\AtBeginSubsection[]
-{
-  \begin{frame}<beamer>{Outline}
-    \tableofcontents[currentsection,currentsubsection]
-  \end{frame}
-}
-
-
 % If you wish to uncover everything in a step-wise fashion, uncomment
 % the following command: 
 
@@ -157,12 +146,18 @@
     \tikzstyle{every node} = [draw]
     \node (c1) [circle] at (0, 1) {\tiny $C_1$};
     \node (c2) [circle] at (0, 2) {\tiny $C_2$};
-    \invisible<2>{\node (m)  [circle] at (2, 1.5) {\tiny $M$};}
+    \invisible<2>{\node (m)  [circle, fill=green!30] at (2, 1.5) {\tiny $M$};}
     \invisible<1>{\node (fm) [star, star points=10, fill=red] at (2, 1.5) {\tiny BOOM};}
     \node (s1) [circle] at (4, 0) {\tiny $S_1$};
     \node (s2) [circle] at (4, 1) {\tiny $S_2$};
-    \node (s3) [circle] at (4, 2) {\tiny $S_3$};
-    \node (s4) [circle] at (4, 3) {\tiny $S_4$};
+    \visible<1> {
+      \node (s3) [circle, fill=green!30] at (4, 2) {\tiny $S_3$};
+      \node (s4) [circle, fill=green!30] at (4, 3) {\tiny $S_4$};
+    }
+    \visible<2> {
+      \node (fs3) [circle] at (4, 2) {\tiny $S_3$};
+      \node (fs4) [circle] at (4, 3) {\tiny $S_4$};
+    }
     \invisible<2>{
       \foreach \from/\to in {c1/m, c2/m}
         \draw [<->] (\from) -- (\to);
@@ -193,7 +188,8 @@
   \end{itemize}
 \end{frame}
 
-\subsection{Consensus}
+\section{Consensus}
+\subsection{On the problem and the model}
 \begin{frame}{Consensus}
   \begin{itemize}
     \item Consider a collection of processes that can propose values. A \alert{consensus} algorithm ensures that a single value among the proposed ones is chosen and the processes are then able to learn the chosen value.
@@ -223,6 +219,7 @@
   \end{itemize}
 \end{frame}
 
+\subsection{Building a safe and resilient consensus algorithm}
 \begin{frame}{So let's try to build a consensus algorithm!}
   A na\"ive algorithm would use a single distinguished acceptor which chooses the first proposal it receives. It is safe, but it does not tolerate the failure of that single acceptor.
   \begin{figure}[!h]
