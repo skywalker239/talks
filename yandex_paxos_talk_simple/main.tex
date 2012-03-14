@@ -252,7 +252,7 @@
     \item Without failures and message loss, want to choose a value if there is only \alert{one} proposer and it proposes \alert{one} value. This suggests the following invariant:
   \end{itemize}
   \begin{invariant}[P1]
-    A proposer must accept the first value it receives.
+    An acceptor must accept the first value it receives.
   \end{invariant}
 \end{frame}
 
@@ -434,7 +434,7 @@
       \draw [thick, densely dotted] (4.5, -0.5) -- (4.5, 4.5);
       \node at (4.5, -1) {$n-1$};
       \foreach \n in {0, 3, 4}
-        \node [draw, fill=yellow] at (4.5, \n) {};
+        \node [draw, fill=blue] at (4.5, \n) {};
     }
   \end{tikzpicture}
   \end{figure}
