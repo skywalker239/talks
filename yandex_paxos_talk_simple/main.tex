@@ -199,14 +199,14 @@
         \item Only a single value is chosen.
         \item A process never learns that a value has been chosen unless it actually has been.
       \end{itemize}
-    \item The liveness property is that if enough processes stay alive, then eventually a value is chosen and all nonfaulty processes eventually learn it.
+    \item The \alert{liveness} property is that if enough processes stay alive, then eventually a value is chosen and all nonfaulty processes eventually learn it.
   \end{itemize}
 \end{frame}
 
 \begin{frame}{Process roles}
   \begin{itemize}
     \item Proposers propose values.
-    \item Acceptors accept proposals and choose the consensus value.
+    \item Acceptors accept proposals and determine the consensus value.
     \item Learners learn the chosen value.
   \end{itemize}
 \end{frame}
@@ -272,7 +272,7 @@
       \draw [->] (p2) -- (a\n);
     }
     \visible<2>{
-        \node (A) [draw, fill=green!30] at (4, 2) {$A_3$};
+        \node (A) [draw, fill=green!30] at (4, 2) {$A_2$};
         \node at (6.5, 2) {value of $P_1$ chosen!};
         \draw [->] (p1) -- (A);
     }
@@ -282,10 +282,10 @@
         \draw [dotted, very thick, ->, red] (p1) -- (A);
     }
     \visible<1,4>{
-        \node (A) [draw] at (4, 2) {$A_3$};
+        \node (A) [draw] at (4, 2) {$A_2$};
     }
     \visible<5>{
-        \node (A) [draw, fill=blue!30] at (4, 2) {$A_3$};
+        \node (A) [draw, fill=blue!30] at (4, 2) {$A_2$};
         \node at (6.5, 2) {value of $P_2$ chosen!};
         \draw [->] (p2) -- (A);
     }
@@ -302,7 +302,13 @@
 \begin{frame}{Multiple proposals}
   To counter this deadlock, we must allow the acceptors to accept more than one proposal.
   \begin{itemize}
-    \item A proposal is a pair $(n, v)$ where $n \in \mathbb{N}$ and $v$ is a proposed value. Different proposals must have different numbers.
+    \item A proposal is a pair $(n, v)$ where $n \in \mathbb{N}$ and $v$ is a proposed value.
+    \item Proposal numbers \alert{must be unique}. That means
+    \begin{invariant}[P3]
+      A value of the proposal is uniquely determined by its number.
+    \end{invariant}
+    
+    {\small E.g. with $k$ proposers, the $i$-th proposer could generate proposal numbers from $\{ i + nk \mid n \in \mathbb{N} \}$.}
     \item A value is chosen when a \alert{single proposal with that value} is accepted by a majority of acceptors.
   \end{itemize}
 \end{frame}
@@ -334,7 +340,8 @@
       \draw [thick] (0, \n) -- (6, \n);
     }
     \node at (-0.5, 0) {$A_0$};
-    \draw [very thick, ->] (0, 0) -- (4.5, 0);
+    \draw [dotted, very thick] (0, 0) -- (3, 0);
+    \draw [very thick, ->] (3, 0) -- (4.5, 0);
     \draw [very thick, red] (4.5, 0) -- (6, 0);
     \draw [loosely dashed, very thick] (3, -1) -- (3, 4);
     \node at (1.5, 2.5) {$(n, v)$ chosen};
@@ -358,21 +365,20 @@
   \end{invariant}
 
   \begin{itemize}
-    \item This is actually the correct invariant, but maintaining it is subtle.
     \item No single process knows that a proposal is chosen the moment it is chosen!
     \item How do we extract the maybe-chosen value to issue a proposal?
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Maintaining $P2^b$}
-  \begin{itemize}
-    \item Suppose a proposer wants to issue a proposal numbered $n$.
-    \item It asks a majority $Q$ of acceptors for their \alert{highest-numbered accepted proposal} with proposal number \alert{less than $n$}.
-    \item If there was some $(m, v), m < n$ that was chosen, then it was chosen by some $Q'$. $Q$ and $Q'$ have an acceptor in common, so the correct value is the value of one of our gathered proposals. How do we find it?
-    \item By induction on $P2^b$ all proposals ever issued (and accepted) with numbers in $[m, n)$ have value $v$.
-    \item So if we have one proposal from $Q$ in our set (with value $v$), then all higher-numbered also have $v$. Just take the maximum.
-  \end{itemize}
-\end{frame}
+%\begin{frame}{Maintaining $P2^b$}
+%  \begin{itemize}
+%    \item Suppose a proposer wants to issue a proposal numbered $n$.
+%    \item It asks a majority $Q$ of acceptors for their \alert{highest-numbered accepted proposal} with proposal number \alert{less than $n$}.
+%    \item If there was some $(m, v), m < n$ that was chosen, then it was chosen by some $Q'$. $Q$ and $Q'$ have an acceptor in common, so the correct value is the value of one of our gathered proposals. How do we find it?
+%    \item By induction on $P2^b$ all proposals ever issued (and accepted) with numbers in $[m, n)$ have value $v$.
+%    \item So if we have one proposal from $Q$ in our set (with value $v$), then all higher-numbered also have $v$. Just take the maximum.
+%  \end{itemize}
+%\end{frame}
 
 \begin{frame}{Maintaining $P2^b$: a picture}
   \begin{figure}[!h]
@@ -385,9 +391,9 @@
     }
 
     \draw [thick, densely dotted, green] (1, -0.5) -- (1, 4.5);
-    \node at (1, -1) {$m$};
+    \node at (1, -1) {$m$ \tiny (chosen)};
     \draw [thick, densely dotted] (5.5, -0.5) -- (5.5, 4.5);
-    \node at (5.5, -1) {$n$};
+    \node at (5.5, -1) {$n$ \tiny (want to issue)};
 
     \node [draw, fill=red] at (0.5, 3) {};
 
@@ -396,18 +402,62 @@
 
     \node [draw, fill=green] at (2, 1) {};
     \node [draw, fill=green] at (3, 4) {};
+
+    \visible<2->{
+        \foreach \n in {0, 1, 3}
+            \draw [thick, red] (0, \n) -- (6, \n);
+    }
+    \visible<2> {
+        \node at (3, -2) { Ask a majority for maximal accepted proposals less than $n$.};
+    }
+
+    \visible<3> {
+        \node [draw, star, star points=5, fill=green] at (1, 0) {};
+        \node at (3, -2) { The correct one is there, but we don't know $m$! };
+    }
+    \visible<4-> {
+        \node [draw, star, star points=5, fill=green] at (2, 1) {};
+    }
+    \visible<4> {
+        \node at (3, -2) { By induction, all proposals in $[m, n)$ are correct! };
+    }
+    \visible<5> {
+        \node at (3, -2) { Propose the value of the maximal maximal proposal. };
+    }
+  \end{tikzpicture}
+  \end{figure}
+\end{frame}
+
+\begin{frame}{Maintaining $P2^b$: another picture}
+  \begin{figure}[!h]
+  \centering
+  \begin{tikzpicture}
+    \tikzstyle{every node} = [shape=circle]
+    \foreach \n in {0, 1, 2, 3, 4} {
+      \node at (-0.5, \n) {$A_\n$};
+      \draw [thick] (0, \n) -- (6, \n);
+    }
+
+    \draw [thick, densely dotted] (5.5, -0.5) -- (5.5, 4.5);
+    \node at (5.5, -1) {$n$ \tiny (want to issue)};
+
+    \node [draw, fill=red] at (0.5, 3) {};
+    \node [draw, fill=blue] at (1.5, 1) {};
+
+    \foreach \n in {0, 2, 4}
+        \draw [thick, red] (0, \n) -- (6, \n);
+    \node at (3, -1.5) {If a majority has no accepted proposals, free to propose anything.};
   \end{tikzpicture}
   \end{figure}
 \end{frame}
 
 \begin{frame}{More on $P2^b$}
   \begin{itemize}
-    \item Note that if there is a majority $Q$ that has \alert{no} accepted proposals numbered less than $n$ then this $Q$ certifies that the proposer is free to propose any value in proposal $n$ without compromising $P2^b$.
-    \item So, the algorithm for a proposal number $n$ is to collect a majority of highest-numbered accepted proposals having numbers less than $n$, select the highest-numbered and propose its value or propose own value if none... isn't it?
+    \item Is it enough to just ask a majority of acceptors for their maximal accpted proposals and re-propose the value of the maximum one?
   \end{itemize}
 \end{frame}
 
-\begin{frame}{No it isn't!}
+\begin{frame}{Not if there are many proposers!}
   \begin{figure}[!h]
   \centering
   \begin{tikzpicture}
@@ -419,42 +469,239 @@
 
     \draw [thick, densely dotted] (5.5, -0.5) -- (5.5, 4.5);
     \node at (5.5, -1) {$n$};
+    \draw [thick, densely dotted] (4.5, -0.5) -- (4.5, 4.5);
+    \node at (4.5, -1) {$n-1$};
 
-    \node [draw, fill=red] at (0.5, 3) {};
-    \node [draw, fill=green] at (1.5, 2) {};
+    %\node [draw, fill=red] at (0.5, 3) {};
+    %\node [draw, fill=green] at (1.5, 2) {};
     \node [draw, fill=blue] at (2, 4) {};
-    \node [draw, fill=gray] at (2.5, 0) {};
-    \node [draw, fill=orange] at (3, 1) {};
-
-    \visible<1>{
-      \node at (3, -2) {\small Suppose we do the above for $n$ and select the orange value.};
+    %\node [draw, fill=gray] at (2.5, 0) {};
+    \visible<1,2>{
+        \foreach \n in {1, 2, 4}
+          \draw [thick, red] (0, \n) -- (6, \n);
+    }
+    \visible<1> {
+        \node at (3, -1.5) {$P_1$ asks a majority wrt $n-1$ and gets the blue value};
     }
     \visible<2> {
-      \node at (3, -2) {\small Then we get delayed and this happens. FAIL.};
-      \draw [thick, densely dotted] (4.5, -0.5) -- (4.5, 4.5);
-      \node at (4.5, -1) {$n-1$};
-      \foreach \n in {0, 3, 4}
+        \node at (3, -1.5) {$P_1$ goes to sleep.};
+    }
+
+    \visible<3->{
+      \node [draw, fill=orange] at (3, 1) {};
+    }
+    \visible<3>{
+      \node at (3, -1.5) {Someone proposes the orange value, $A_1$ accepts.};
+    }
+
+    \visible<4,5>{
+      \foreach \n in {0, 1, 4}
+        \draw [thick, red] (0, \n) -- (6, \n);
+    }
+    \visible<4>{
+      \node at (3, -1.5) {$P_2$ asks a majority wrt $n$, gets the orange value.};
+    }
+    \visible<5>{
+      \node at (3, -1.5) {$P_2$ then goes to sleep.};
+    }
+
+    \visible<6->{
+      \foreach \n in {0, 2, 3}
         \node [draw, fill=blue] at (4.5, \n) {};
     }
+    \visible<6>{
+      \node at (3, -1.5) {$P_1$ wakes up and ($n-1$, blue) is chosen.};
+    }
+    \visible<7>{
+      \node at (3, -1.5) {Proposing ($n$, orange) now violates $P2^b$.};
+    }
+
   \end{tikzpicture}
   \end{figure}
 \end{frame}
 
-\begin{frame}{What do we do to uphold $P2^b$?}
+\begin{frame}{The problem with $P2^b$}
   \begin{itemize}
-    \item We would be okay if we could gather the accepted less-than-$n$ proposals, calculate the maximum and propose it in one atomic step, but good luck doing that in an asynchronous distributed system.
-    \item Instead, when asking the acceptors for their maximal less-than-$n$ accepted proposal, we ask them to \alert{promise} not to accept any proposal numbered less than $n$ after they receive our request.
-    \item Now it is easy to see that $P2^b$ always holds and consistency is thus achieved.
-    \item We have broken $P1$, though, but we can live with it.
+    \item The problem is that to maintain $P2^b$, we need to know the maximal proposal less than $n$ that was \alert{or will ever be} accepted by some majority of acceptors.
+    \item Can't predict the future -- enforce it!
+    \item Make the acceptors \alert{promise} not to accept any proposal less than $n$ when responding to an initial request from a proposer.
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Modifying $P1$}
+\begin{frame}{Fixing $P1$.}
+  The promises break $P1$. Let us tweak it a bit.
+
   \begin{invariant}[$P1^a$]
-    An acceptor must accept any proposal it receives if it has not promised not to do so to some proposer.
+    An acceptor must accept any proposal it receives if it has not promised not to do so.
   \end{invariant}
 
-  Note that while this is weaker than $P1$, it achieves the same purpose. If there is only one proposer and no process and network failures, then nothing will cause the acceptors to make promises harmful to the proposer's progress, so the first proposal will be accepted.
+  This is still good enough, because if there is only one proposer $P$, then no promises will be made that could impede its progress, so its proposal will be accepted.
+\end{frame}
+
+\begin{frame}{Invariants recap}
+  \begin{invariant}[$P1^a$]
+    An acceptor must accept any proposal it receives if it has not promised not to do so.
+  \end{invariant}
+  \begin{invariant}[$P2^b$]
+    If a proposal with value $v$ is chosen, then every higher-numbered proposal \alert{issued} by any proposer has value $v$.
+  \end{invariant}
+  \begin{invariant}[P3]
+    A value of the proposal is uniquely determined by its number.
+  \end{invariant}
+  These invariants are enough to build a safe and resilient consensus protocol.
+\end{frame}
+
+\begin{frame}{Protocol: the proposer}
+  \begin{itemize}
+    \item Choose a unique proposal number $n$.
+    \item Send a message $\textsc{prepare}(n)$ to a majority $M$ of acceptors.
+    \item Collect responses $Pr_M = \{ \textsc{promise}_m(n, n', v') \mid m \in M \}$ from $M$,  where $v'$ can be a value or $\bot$ (in which case $n' = -\infty$) if $m$ has never accepted anything.
+    \item Select $v^*$ = the value of a promise with maximal $n'$ among $Pr_M$.
+    \item If $v^* = \bot$, choose $v^*$ arbitrarily.
+    \item Send a message $\textsc{accept}(n, v^*)$ to $M$.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Protocol: the acceptor}
+  \begin{itemize}
+    \item Upon receiving $\textsc{prepare}(n)$ and we have never received a $\textsc{prepare}(m)$ with $m > n$, respond with $\textsc{promise}(n, n', v')$ where $(n', v')$ is the maximal proposal numbered less than $n$ that we have ever accepted (or $(-\infty, \bot)$ if none) and record that we have promised not to accept proposals numbered less than $n$.
+    \item Upon receiving $\textsc{accept}(n, v)$, accept $(n, v)$ if we have not promised not to do so.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \begin{itemize}
+  \item The protocol satisfies the invariants $P1^a, P2^b$ and $P3$, so it is a safe consensus protocol.
+  \item Note that in its current form, the value is chosen by the system as a whole. No single process really learns the value yet. We'll deal with that later.
+  \item Is our protocol \alert{live}?
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{No, even with strict synchrony assumptions.}
+  \begin{figure}[!h]
+  \centering
+  \begin{tikzpicture}[scale=1.5]
+    \tikzstyle{every node} = [shape=circle]
+      \node at (-0.5, 2) {$P_1$};
+      \node at (-0.5, 3) {$P_2$};
+      \node at (-0.5, 0) {$\mathbb{A}$};
+      \foreach \n in {2, 3} {
+        \draw (0, \n) -- (3.25, \n);
+        \draw [dotted] (3.25, \n) -- (6, \n);
+      }
+      \draw [very thick] (0, 0) -- (3.25, 0);
+      \draw [dotted, very thick] (3.25, 0) -- (6, 0);
+
+      \draw [->] (0.5, 2) -- (1, 0);
+      \draw [->] (1, 0) -- (1.5, 2);
+      \node at (1, -0.5) {\tiny \textsc{prepare}$(n_1)$};
+
+      \draw [->] (1, 3) -- (1.75, 0);
+      \draw [->] (1.75, 0) -- (2.5, 3);
+      \node at (1, 3.25) {\tiny \textsc{prepare}$(n_1 > n_2)$};
+
+      \draw [dashed, thick, ->, red] (1.5, 2) -- (2, 0);
+      \node at (2.25, -0.5) {\tiny \textsc{accept}$(n_1, v_1)$};
+
+      \draw [dashed, thick, ->, red] (2.5, 3) -- (3.25, 0);
+      \node at (2.5, 3.25) {\tiny \textsc{accept}$(n_2, v_2)$};
+
+      \draw [->] (2, 2) -- (2.5, 0);
+      \draw [->] (2.5, 0) -- (3, 2);
+      \node at (2, 2.5) {\tiny \textsc{prepare}$(n_3 > n_2)$};
+  
+  \end{tikzpicture}
+  \end{figure}
+\end{frame}
+
+\begin{frame}{This is not a coincidence.}
+  \begin{theorem}[Fischer, Lynch, Patersson '85]
+    In an asynchronous system with \alert{at most one} faulty process, a consensus protocol cannot be both safe and live.
+  \end{theorem}
+  \begin{itemize}
+    \item We'll talk about it in more detail if time permits.
+    \item For our protocol to be live, it is necessary that there is only one \alert{distinguished proposer} that issues proposals. Electing one is a weak form of consensus, so some synchrony is required.
+    \item Multiple proposers can only impede progress; \alert{safety is never compromised}.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Interlude: eventually synchronous systems}
+  \begin{figure}[!h]
+  \centering
+  \begin{tikzpicture}
+    \tikzstyle{every node} = [shape=circle]
+    \draw [thick, ->] (0, 0) -- (5,0);
+    \draw [thick, ->, green] (5, 0) -- (10, 0);
+    \node at (10.1, -0.1) {$t$};
+    \node [draw, fill=black] at (5, 0) {};
+    \node at (5, -0.5) {\small GST};
+    \node at (2.5, -0.25) {\tiny totally asynchronous};
+    \node at (7.5, -0.25) {\tiny synchronous, no failures};
+  \end{tikzpicture}
+  \end{figure}
+  \begin{itemize}
+    \item Global Stabilization Time (GST) is unknown to the processes.
+    \item After GST, no processes fail, no messages are lost and message delays and clock drift become bounded (but still unknown to the processes).
+    \item In theory, everything remains synchronous forever. In practice, it is enough for the synchrony period to be long enough for some useful work to be done.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Synchronous leader election (an example)}
+  \begin{figure}[!h]
+  \centering
+  \begin{tikzpicture}
+    \tikzstyle{every node} = [shape=circle]
+    \node (a) [draw] at (0, 0) {$A$};
+    \node (b) [draw] at (2, 0) {$B$};
+    \node (c) [draw] at (1, 1) {$C$};
+    \draw [<->] (a) -- (b);
+    \draw [<->] (b) -- (c);
+    \draw [<->] (a) -- (c);
+  \end{tikzpicture}
+  \end{figure}
+  \begin{itemize}
+    \item Everyone pings everyone else once in a while.
+    \item A process considers itself the leader if it has not seen pings from processes with larger names in a while.
+    \item This converges after GST.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Learning the chosen value}
+  \begin{itemize}
+    \item So now we have a distinguished proposer.
+    \item Let's also make it a distinguished \alert{learner}!
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{The Paxos protocol}
+  \begin{figure}[!t]
+  \centering
+  \begin{tikzpicture}
+    \tikzstyle{every node} = [shape=circle]
+      \node at (-0.5, 0) {$\mathbb{L}$};
+      \node at (-0.5, 1) {$\mathbb{A}$};
+      \node at (-0.5, 2) {$P$};
+
+      \foreach \n in {0, 1} {
+        \draw [very thick] (0, \n) -- (10, \n);
+      }
+      \draw (0, 2) -- (10, 2);
+
+      \node at (0.75, 2.25) {\small \textsc{prepare}$(n)$};
+      \draw [->] (0.5, 2) -- (1, 1);
+      \node at (2.25, 0.75) {\small \textsc{promise}$(n, \ldots)$};
+      \draw [->, very thick] (2, 1) -- (2.5, 2);
+      \node at (3.75, 2.25) {\small \textsc{accept}$(n, v)$};
+      \draw [->] (3.5, 2) -- (4, 1);
+      \node at (5.25, 0.75) {\small \textsc{accepted}$(n, v)$};
+      \draw [->, very thick] (5, 1) -- (5.5, 2);
+      \node at (6.75, 2.25) {\small \textsc{commit}$(v)$};
+      \draw [->] (6.5, 2) -- (7, 1);
+      \draw [->] (6.5, 2) -- (7, 0);
+      
+  \end{tikzpicture}
+  \end{figure}
+  Invented by Leslie Lamport in 1989.
 \end{frame}
 \end{document}
 
