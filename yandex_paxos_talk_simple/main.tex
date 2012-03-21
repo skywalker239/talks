@@ -703,6 +703,326 @@
   \end{figure}
   Invented by Leslie Lamport in 1989.
 \end{frame}
+
+\subsection{Consensus on a sequence of values}
+\begin{frame}{A replicated fault-tolerant log}
+  \begin{figure}[!t]
+  \centering
+  \begin{tikzpicture}
+    \tikzstyle{every node} = [shape=circle]
+      \draw (0, 0) -- (10, 0);
+      \draw (0, 0.5) -- (10, 0.5);
+%      \fill[color=green!30] (1, 0) rectangle (1, 0.5);
+      \foreach \n in {0, 1, 2, 3, 4, 5, 6, 7, 8} {
+%        \fill[gray] (\n, 0) rectangle (1, 0.5);
+        \draw (\n, 0) -- (\n, 0.5);
+        \node at (\n+0.5, -0.5) {\small $\n$};
+      }
+      \draw (9, 0) -- (9, 0.5);
+      \node at (9.5, -0.5) {\small $\ldots$};
+
+      \node [draw, fill=green!30] (P1) at (1.5, 1.5) {\small $P_1$};
+      \node [draw, fill=blue!30] (P2) at (4.5, 1.5) {\small $P_2$};
+
+      \foreach \n in {0, 2, 3, 5} {
+        \draw [->] (P1) -- (\n+0.5, 0.5);
+%        \fill[color=green!30] (\n, 0) rectangle (1, 0.5);
+      }
+      \fill[color=green!30] (1, 0) rectangle (1, 0.5);
+      \foreach \n in {1, 4, 6, 7} {
+        \draw [->] (P2) -- (\n+0.5, 0.5);
+%        \fill[color=blue!30] (\n, 0) rectangle (1, 0.5);
+      }
+
+  \end{tikzpicture}
+  \end{figure}
+  \begin{itemize}
+    \item Each process can submit a value to the log.
+    \item Want the log to be consistent across processes and tolerate process failures.
+    \item Captures many useful things (e.g. it could be a DB transaction log).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{A replicated fault-tolerant log: easy with Paxos!}
+  \begin{itemize}
+    \item Each process keeps its own copy of the log (with some ``holes'', probably).
+    \item To submit a value to the log, find the earliest unknown log entry and run consensus on it.
+    \item After achieving consensus, we have either submitted our entry or learned a previously unknown entry.
+    \item Rinse, repeat. (Can be made starvation-free)
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Replicated log as atomic broadcast}
+  \begin{itemize}
+    \item An (eventually hole-free) replicated log essentially delivers a stream of messages to all processes \alert{in the same order}
+    \item This pattern of communication is called \alert{atomic (or uniform total order) broadcast}.
+    \item So if we can do consensus, we can also do atomic broadcast.
+    \item Can we do it \alert{fast}?
+  \end{itemize}
+\end{frame}
+
+\section{Performance Engineering}
+\subsection{Multi Paxos}
+\begin{frame}{Multi Paxos}
+  \begin{itemize}
+    \item Multi Paxos achieves consensus on a sequence of values $\{v_0, v_1, \ldots\}$ by logically running a separate Paxos instance on each of $v_i$.
+    \item The protocol messages are the same with the instance number piggybacked onto them (e.g. \textsc{prepare}$(i, n)$ etc.)
+    \item Turns out that the \textsc{prepare} phase can be (almost) eliminated.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{\textsc{prepare} pre-execution}
+  \begin{itemize}
+    \item Note that \textsc{prepare}$(i, n)$ doesn't need a value.
+    \item So we can say \textsc{prepare}$([i, i+M), n)$ or even \textsc{prepare}$([i, +\infty), n)$ if you live in theory!
+    \item If things are in order (e.g. after GST) then the distinguished proposer runs \textsc{prepare} on instances that no one has touched yet, so all the \textsc{promise}s can be collapsed into one short \textsc{ACK} (they don't carry values).
+    \item In the general case, the acceptors respond with some finite sets of \textsc{promise}s.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Multi Paxos: conclusion}
+  \begin{itemize}
+    \item So now after GST we can run \textsc{prepare} arbitrarily rarely and submit a value with one roundtrip of \textsc{accept}/\textsc{accepted}. This is theoretically optimal.
+    \item Does it work well on real computers in real networks?
+  \end{itemize}
+\end{frame}
+
+\subsection{Practical bottlenecks}
+\begin{frame}{Practical Paxos bottlenecks}
+  \begin{figure}[!t]
+  \centering
+  \begin{tikzpicture}
+    \tikzstyle{every node} = [shape=circle]
+      \node at (-0.5, 0) {$\mathbb{L}$};
+      \draw [very thick] (0, 0) -- (10, 0);
+
+      \foreach \n in {0, 1, 2} {
+          \node at (-0.5, 1+\n/2) {$A_\n$};
+          \draw (0, 1+\n/2) -- (10, 1+\n/2);
+      }
+
+      \node at (-0.5, 3) {$P$};
+      \draw (0, 3) -- (10, 3);
+
+      \foreach \n in {1, 1.5, 2} {
+          \draw [->] (0.5, 3) -- (0.5+\n/4, \n);
+      }
+      \draw [very thick, ->] (0.5, 3) -- (0.6, 0);
+
+      \node at (1, -0.5) {\small \textsc{accept}$(i, n, v)$};
+
+      \foreach \n in {1, 1.5, 2} {
+          \draw [->] (3, \n) -- (4.5-\n/3, 3);
+      }
+      \node at (4, -0.5) {\small \textsc{accepted}$(i, n, v)$};
+
+      \foreach \n in {1, 1.5, 2} {
+          \draw [->] (7, 3) -- (7+\n/4, \n);
+      }
+      \draw [very thick, ->] (7, 3) -- (7.1, 0);
+
+      \node at (7.5, -0.5) {\small \textsc{commit}$(i, n, v)$};
+  \end{tikzpicture}
+  \end{figure}
+\end{frame}
+
+\begin{frame}{Bitrate on \textsc{accept/commit}}
+  \begin{figure}[!h]
+  \centering
+  \begin{tikzpicture}[scale=0.7]
+    \tikzstyle{every node} = [shape=circle]
+      \node at (-0.5, 0) {$\mathbb{L}$};
+      \draw [very thick] (0, 0) -- (10, 0);
+
+      \foreach \n in {0, 1, 2} {
+          \node at (-0.5, 1+\n/2) {$A_\n$};
+          \draw (0, 1+\n/2) -- (10, 1+\n/2);
+      }
+
+      \node at (-0.5, 3) {$P$};
+      \draw (0, 3) -- (10, 3);
+
+      \foreach \n in {1, 1.5, 2} {
+          \draw [->] (5, 3) -- (5+\n/4, \n);
+      }
+      \draw [very thick, ->] (5, 3) -- (5.1, 0);
+%      \node at (5.5, 3.5) {\small \textsc{accept/commit}$(i, n, v)$};
+  \end{tikzpicture}
+  \end{figure}
+  \begin{itemize}
+    \item Values are typically rather \alert{big}.
+    \item Na\"ively, $2(|\mathbb{A}| + |\mathbb{L}|)$ \alert{big} outgoing messages per one committed value.
+    \item Imagine $10$s of acceptors and $100$s of learners. Forget about throughput.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Multicast}
+  \begin{figure}[!h]
+  \centering
+  \begin{tikzpicture}
+    \tikzstyle{every node} = [draw]
+    \node (S) [circle, fill=green!30] at (5, 2) {\tiny $S$};
+    \node (SW) [rectangle] at (5, 1) {\tiny multicast switch/router};
+    \node (T1) [circle, fill=green!30] at (3, 0) {\tiny $T_1$};
+    \node (T2) [circle] at (5, 0) {\tiny $T_2$};
+    \node (T3) [circle, fill=green!30] at (7, 0) {\tiny $T_3$};
+
+    \draw [->, green] (S) -- (SW);
+    \draw [->, green] (SW) -- (T1);
+    \draw (SW) -- (T2);
+    \draw [->, green] (SW) -- (T3);
+  \end{tikzpicture}
+  \end{figure}
+  \begin{itemize}
+    \item Hosts can subscribe to \alert{multicast groups} (special network addresses).
+    \item The source sends one packet to a multicast address and the network hardware distributes it along a spanning tree of the group.
+    \item Huge win in throughput with many receivers.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Incoming \textsc{accepted} messages}
+  \begin{figure}[!t]
+  \centering
+  \begin{tikzpicture}[scale=0.7]
+    \tikzstyle{every node} = [shape=circle]
+      \node at (-0.5, 0) {$\mathbb{L}$};
+      \draw [very thick] (0, 0) -- (10, 0);
+
+      \foreach \n in {0, 1, 2} {
+          \node at (-0.5, 1+\n/2) {$A_\n$};
+          \draw (0, 1+\n/2) -- (10, 1+\n/2);
+      }
+
+      \node at (-0.5, 3) {$P$};
+      \draw (0, 3) -- (10, 3);
+
+      \foreach \n in {0, 1, 1.5, 2} {
+          \draw [thick, red, ->] (0.5, 3) -- (0.5, \n);
+      }
+%      \draw [very thick, ->] (0.5, 3) -- (0.6, 0);
+
+      \node at (1, -0.5) {\small \textsc{accept}$(i, n, v)$};
+
+      \foreach \n in {1, 1.5, 2} {
+          \draw [->] (6, \n) -- (7.5-\n/3, 3);
+      }
+      \node at (7, -0.5) {\small \textsc{accepted}$(i, n, v)$};
+
+%      \foreach \n in {1, 1.5, 2} {
+%          \draw [->] (7, 3) -- (7+\n/4, \n);
+%      }
+%      \draw [very thick, ->] (7, 3) -- (7.1, 0);
+%
+%      \node at (7.5, -0.5) {\small \textsc{commit}$(i, n, v)$};
+  \end{tikzpicture}
+  \end{figure}
+  \begin{itemize}
+    \item Now just two outgoing messages for each committed value.
+    \item $|\mathbb{A}|$ incoming \alert{big} messages for each value, still no chance of good throughput.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Solution: Consensus on value ids}
+  \begin{figure}
+  \centering
+  \begin{tikzpicture}[scale=0.7]
+    \tikzstyle{every node} = [shape=circle]
+      \node at (-0.5, 0) {$\mathbb{L}$};
+      \draw [very thick] (0, 0) -- (10, 0);
+
+      \foreach \n in {0, 1, 2} {
+          \node at (-0.5, 1+\n/2) {$A_\n$};
+          \draw (0, 1+\n/2) -- (10, 1+\n/2);
+      }
+
+      \node at (-0.5, 3) {$P$};
+      \draw (0, 3) -- (10, 3);
+
+      \foreach \n in {0, 1, 1.5, 2} {
+          \draw [thick, red, ->] (0.5, 3) -- (0.5, \n);
+      }
+
+      \node at (1, -0.25) {\tiny \textsc{accept}$(i, n, v, vid)$};
+
+      \foreach \n in {1, 1.5, 2} {
+          \draw [->] (3, \n) -- (4.5-\n/3, 3);
+      }
+      \node at (4, -0.25) {\tiny \textsc{accepted}$(i, n, vid)$};
+
+      \foreach \n in {0, 1, 1.5, 2} {
+          \draw [->, thick, red] (7, 3) -- (7, \n);
+      }
+
+      \node at (7.5, -0.25) {\tiny \textsc{commit}$(i, n, vid)$};
+  \end{tikzpicture}
+  \end{figure}
+  \begin{itemize}
+    \item Let $vid$ be a short locally unique identifier for $v$ (say $|v| \mid 8000$ bytes, $|vid| = 8$ bytes).
+    \item Now just one outgoing big message (and one short one) and $|\mathbb{A}|$ incoming short messages per value.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Still not good: packet- and syscall rate}
+  \begin{itemize}
+    \item Consider a $10$ Gbit/s stream of $8000$-byte values with $5$ acceptors.
+    \item That's 312500 outgoing packets/s and \alert{1562500} incoming packets/s.
+    \item Network hardware is packet rate-limited and 1.5M pps on a single port is just too much.
+    \item 1.5M system calls per second to read all those packets is very straining on the OS kernel, too.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Solution: Ring Paxos}
+  \begin{figure}
+  \centering
+  \begin{tikzpicture}
+    \tikzstyle{every node} = [shape=circle]
+      \node at (-0.5, 0) {$\mathbb{L}$};
+      \draw [very thick] (0, 0) -- (10, 0);
+
+      \node at (-0.5, 3) {$P = A_0$};
+      \draw (0, 3) -- (10, 3);
+
+      \foreach \n in {1, 2, 3} {
+        \node at (-0.5, 2.5-\n/2) {$A_\n$};  
+        \draw (0, 2.5-\n/2) -- (10, 2.5-\n/2);
+      }
+
+      \foreach \n in {0, 1, 1.5, 2} {
+          \draw [thick, red, ->] (0.5, 3) -- (0.5, \n);
+      }
+
+      \node at (1, -0.25) {\small \textsc{accept}$(i, n, v, vid)$};
+
+      \draw [->] (3, 2) -- (3.5, 1.5);
+      \draw [->] (3.6, 1.5) -- (4.1, 1);
+      \draw [->] (4.2, 1) -- (5, 3);
+      
+%      \foreach \n in {1, 1.5, 2} {
+%          \draw [->] (3, \n) -- (4.5-\n/3, 3);
+%      }
+      \node at (4, 3.25) {\small \textsc{accepted}$(i, n, vid)$};
+
+      \foreach \n in {0, 1, 1.5, 2} {
+          \draw [->, thick, red] (7, 3) -- (7, \n);
+      }
+
+      \node at (7.5, -0.25) {\small \textsc{commit}$(i, n, vid)$};
+  \end{tikzpicture}
+  \end{figure}
+\end{frame}
+
+\begin{frame}{Ring Paxos}
+  \begin{itemize}
+    \item Make the distinguished proposer an acceptor.
+    \item During each stability period, organize a quorum of acceptors into a logical ring with the proposer being first in the ring.
+    \item Batch \textsc{accept} with a previous \textsc{commit}, also batch \textsc{accepted} messages for many instances together (they are small).
+    \item One (amortized) outgoing big packet and one incoming small packet per committed value on the proposer.
+    \item With batched acceptance messages, virtually no traffic on the acceptors apart from receiving values.
+    \item Easily achieves 900+ Mbit/s in a tightly clustered group with Gigabit Ethernet interconnect.
+  \end{itemize}
+
+  Invented in 2010 by Fernando Pedone, Marco Primi, Nicolas Schiper and Parisa J. Marandi (USI Lugano).
+\end{frame}
 \end{document}
 
 
