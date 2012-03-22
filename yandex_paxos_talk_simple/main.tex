@@ -971,6 +971,7 @@
   \end{itemize}
 \end{frame}
 
+\subsection{Ring Paxos}
 \begin{frame}{Solution: Ring Paxos}
   \begin{figure}
   \centering
@@ -1022,6 +1023,153 @@
   \end{itemize}
 
   Invented in 2010 by Fernando Pedone, Marco Primi, Nicolas Schiper and Parisa J. Marandi (USI Lugano).
+\end{frame}
+
+\begin{frame}{Achievement unlocked: emergency slides!}
+  \begin{center}
+    \includegraphics{fuck-yeah-clean.png}
+  \end{center}
+\end{frame}
+
+\begin{frame}{FLP impossibility proof}
+Assume the following:
+  \begin{itemize}
+    \item The network can delay and reorder packets arbitrarily, but it never loses them.
+    \item The initial state of a process $p$ is described by $x_p \in \{ 0, 1 \}$, the value $p$ wants to propose.
+    \item We allow only one process to fail in any execution.
+    \item Then a consensus protocol in which there \alert{exists} a process that learns the consensus value cannot be both safe and live.
+    \item We will take any such safe consensus protocol $P$ and construct a livelock run.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Disjoint schedule commutativity}
+  \begin{lemma}
+    Consider two schedules $\sigma_1, \sigma_2$ from some configuration $C$. If the sets of processes taking steps in $\sigma_1$ and $\sigma_2$ are disjoint, then $\sigma_1(\sigma_2(C)) = \sigma_2(\sigma_1(C)) = C'$.
+  \end{lemma}
+  \begin{proof}
+    Obvious.
+  \end{proof}
+\end{frame}
+
+\begin{frame}{Disjoint schedule commutativity}
+  \begin{figure}[!h]
+  \centering
+  \begin{tikzpicture}[transform shape, scale=2]
+    \tikzstyle{every node} = [shape=circle]
+    \node (a) [draw] at (1, 2) {\tiny $C$};
+    \node (b) [draw] at (0, 1) {\tiny $\sigma_1(C)$};
+    \node (c) [draw] at (2, 1) {\tiny $\sigma_2(C)$};
+    \node (d) [draw] at (1, 0) {\tiny $C'$};
+      \draw [->] (a) -- (b) node[pos=.5,sloped,above] {\tiny $\sigma_1$};
+      \draw [->] (a) -- (c) node[pos=.5,sloped,above] {\tiny $\sigma_2$};
+      \draw [dashed, ->] (b) -- (d) node[pos=.5,sloped,below] {\tiny $\sigma_2$};
+      \draw [dashed, ->] (c) -- (d) node[pos=.5,sloped,below] {\tiny $\sigma_1$};
+  \end{tikzpicture}
+  \end{figure}
+\end{frame}
+
+\begin{frame}{Univalent and bivalent configurations}
+  \begin{definition}
+    Let $V$ be a set of decision values of configurations reachable from $C$. C is \alert{bivalent} if $|V| = 2$ and \alert{univalent} if $|V| = 1$ ($0$-valent or $1$-valent).
+
+    Note that $V \ne \varnothing$.
+  \end{definition}
+  \begin{lemma}
+    $P$ has a bivalent initial configuration.
+  \end{lemma}
+\end{frame}
+
+\begin{frame}{Proof of lemma}
+Each initial configuration corresponds to a vector $\{ x_p \mid p \in \mathbb{P} \}$ of initial values.
+  \begin{itemize}
+    \item By partial correctness there exist both $0$-valent and $1$-valent initial configurations.
+    \item There exist two initial configurations $C_0$ and $C_1$ s.t. $C_i$ is $i$-valent and they only differ in one $x_p$.
+    \item Consider an admissible schedule from $C_0$ in which $p$ is initially dead (takes no steps). By total correctness it reaches a decision value of $0$.
+    \item Apply this schedule to $C_1$. Get the same configuration except for state of $p$, but $p$ takes no steps, so the run from $C_1$ also reaches a decision value of $0$.
+    \item Contradiction, as $C_1$ is $1$-valent.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{``Delay'' lemma}
+  \begin{lemma}
+    Let $C$ be a bivalent configuration of $P$ and $e=(p,m)$ be an event applicable to $C$. Let $\mathcal{C}$ be the set of configurations reachable from $C$ without applying $e$ and let $\mathcal{D} = e(\mathcal{C})$. Then $\mathcal{D}$ contains a bivalent configuration.
+  \end{lemma}
+\end{frame}
+
+\begin{frame}{Proof of the delay lemma}
+  \begin{itemize}
+    \item Proof will be by contradiction. Assume that $\mathcal{D}$ contains no bivalent configurations.
+    \item Note that $\mathcal{D}$ contains both $0$- and $1$-valent configurations.
+    \item There exist $C_0$ and $C_1$ that are reachable from $C$ and $C_i$ is $i$-valent by the bivalence of $C$.
+    \item If $C_i$ is in $\mathcal{C}$, then $e(C_i) \in \mathcal{D}$ and is also $i$-valent.
+    \item Otherwise, $e$ was applied on the path to $C_i$ and there exists an $F_i \in \mathcal{D}$ from which $C_i$ is reachable. $F_i$ is then $i$-valent.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Proof of the delay lemma}
+  \begin{itemize}
+    \item Two configurations are \alert{neighbours} iff one of them is reachable from the other in a single step.
+    \item There exist neighbours $F_0, F_1$ in $\mathcal{C}$ s.t. $D_i = e(F_i)$ is $i$-valent, $i = 0,1$.
+    \item W.l.o.g., $F_1 = e'(F_0)$, $e' = (p', m')$.
+    \item Consider two cases: $p \ne p'$ and $p = p'$.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{$p \ne p'$}
+  \begin{figure}[!h]
+  \centering
+  \begin{tikzpicture}[transform shape, scale=1.5]
+    \tikzstyle{every node} = [shape=circle]
+    \node (a) [draw] at (1, 2) {\tiny $F_0$};
+    \node (b) [draw] at (0, 1) {\tiny $E_0$};
+    \node (c) [draw] at (2, 1) {\tiny $F_1$};
+    \node (d) [draw] at (1, 0) {\tiny $E_1$};
+      \draw [->] (a) -- (c) node[pos=.5,sloped,above] {\tiny $e'$};
+      \draw [->] (a) -- (b) node[pos=.5,sloped,above] {\tiny $e$};
+      \draw [dashed, ->] (b) -- (d) node[pos=.5,sloped,below] {\tiny $e'$};
+      \draw [dashed, ->] (c) -- (d) node[pos=.5,sloped,below] {\tiny $e$};
+  \end{tikzpicture}
+  \end{figure}
+Contradiction: $E_1$ is both $0$- and $1$-valent.
+\end{frame}
+
+\begin{frame}{$p = p'$}
+  Consider any finite deciding run from $F_0$ in which $p$ takes no steps, let $\sigma$ be the corresponding schedule and $A = \sigma(F_0)$.
+\end{frame}
+
+\begin{frame}{$p = p'$}
+  \begin{figure}[!h]
+  \centering
+  \begin{tikzpicture}[transform shape, scale=1.5]
+    \tikzstyle{every node} = [shape=circle]
+    \node (f0) [draw] at (1, 2.5) {\tiny $F_0$};
+    \node (f1) [draw] at (2, 2) {\tiny $F_1$};
+    \node (e1) [draw] at (3, 1.5) {\tiny $E_1$};
+    \node (e0) [draw] at (0, 1.5) {\tiny $E_0$};
+    \node (a)  [draw] at (1, 1) {\tiny $A$};
+    \node (nn) [draw] at (2, .5) {};
+    \node (g0) [draw] at (0, 0) {\tiny $G_0$};
+    \node (g1) [draw] at (3, 0) {\tiny $G_1$};
+    \draw [->] (f0) -- (e0) node[pos=.5, above] {\tiny $e$};
+    \draw [->] (f0) -- (f1) node[pos=.5, above] {\tiny $e'$};
+    \draw [->] (f1) -- (e1) node[pos=.5, above] {\tiny $e$};
+    \draw [densely dotted, ->] (f0) -- (a) node[pos=.5, right] {\tiny $\sigma$};
+    \draw [densely dotted, ->] (e0) -- (g0) node[pos=.5, left] {\tiny $\sigma$};
+    \draw [densely dotted, ->] (e1) -- (g1) node[pos=.5, right] {\tiny $\sigma$};
+    \draw [dashed, ->] (a) -- (g0) node[pos=.5, above] {\tiny $e$};
+    \draw [dashed, ->] (a) -- (nn) node[pos=.5, above] {\tiny $e'$};
+    \draw [dashed, ->] (nn) -- (g1) node[pos=.5, above] {\tiny $e$};
+  \end{tikzpicture}
+  \end{figure}
+  Contradiction: the run to $A$ is deciding, but $A$ is bivalent! This concludes the case analysis and proves the lemma.
+\end{frame}
+
+\begin{frame}{Thank you!}
+  \begin{center}
+    {\Huge Questions?} \\
+    \vspace{1cm}
+    {\huge \texttt{skywalker@yandex-team.ru}}
+  \end{center}
 \end{frame}
 \end{document}
 
